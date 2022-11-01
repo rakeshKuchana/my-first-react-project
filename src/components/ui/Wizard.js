@@ -6,6 +6,7 @@ import Stepper from "@mui/material/Stepper";
 import Typography from "@mui/material/Typography";
 import * as React from "react";
 import { useSelector } from "react-redux";
+import useHttp from "../../hooks/use-http";
 import AddressForm from "../forms/AddressForm";
 import ContactForm from "../forms/ContactForm";
 import RequestInfoForm from "../forms/RequestInfoForm";
@@ -16,29 +17,16 @@ const NewServiceOrder = () => {
   const requestNumber = useSelector((state) => state.request.value);
   const addressFormData = useSelector((state) => state.address);
   const contactFormData = useSelector((state) => state.contact);
-  const requestInfoFormIsValid = useSelector((state) => state.requestInfoFormIsValid);
-  const addressFormIsValid = useSelector(state => state.addressFormIsValid);
-  const contactFormIsValid = useSelector(state => state.contactFormIsValid);
-  const [isLoading, setIsLoading] = React.useState(false);
-  const[isError, setIsError] = React.useState(false);
+  const requestInfoFormIsValid = useSelector(
+    (state) => state.requestInfoFormIsValid
+  );
+  const addressFormIsValid = useSelector((state) => state.addressFormIsValid);
+  const contactFormIsValid = useSelector((state) => state.contactFormIsValid);
 
   const [activeStep, setActiveStep] = React.useState(0);
   const [skipped, setSkipped] = React.useState(new Set());
 
-  const createServiceOrder = async (data) => {
-    setIsLoading(true);
-    setIsError(false);
-    const response = await fetch("http://localhost:8080/service-orders", {
-      method: "POST",
-      body: JSON.stringify(data),
-      headers: {
-        "content-type": "application/json"
-      }
-    });
-
-    setIsLoading(false);
-
-  }
+  const { isLoading, isError, transformedData, sendRequest } = useHttp();
 
   const isStepOptional = (step) => {
     return false; //step === 1;
@@ -59,57 +47,56 @@ const NewServiceOrder = () => {
       setActiveStep((prevActiveStep) => prevActiveStep + 1);
       setSkipped(newSkipped);
     }
-    console.log(addressFormIsValid)
+    console.log(addressFormIsValid);
 
     if (activeStep === 1 && addressFormIsValid) {
-        let newSkipped = skipped;
-        if (isStepSkipped(activeStep)) {
-          newSkipped = new Set(newSkipped.values());
-          newSkipped.delete(activeStep);
-        }
-  
-        setActiveStep((prevActiveStep) => prevActiveStep + 1);
-        setSkipped(newSkipped);
+      let newSkipped = skipped;
+      if (isStepSkipped(activeStep)) {
+        newSkipped = new Set(newSkipped.values());
+        newSkipped.delete(activeStep);
       }
 
-      if (activeStep === 2 && contactFormIsValid) {
-        
-        const serviceOrderData = {
-            requestNumber: requestNumber,
-            address: {
-                address: addressFormData.address.value,
-                address2: addressFormData.address2.value,
-                city: addressFormData.city.value,
-                state: addressFormData.state.value,
-                zip: addressFormData.zip.value, 
-            },
-            contact: {
-                firstname: contactFormData.firstname.value,
-                lastname: contactFormData.lastname.value,
-                email: contactFormData.email.value,
-                phone: contactFormData.phone.value
+      setActiveStep((prevActiveStep) => prevActiveStep + 1);
+      setSkipped(newSkipped);
+    }
 
-            }
-        }
+    if (activeStep === 2 && contactFormIsValid) {
+      const serviceOrderData = {
+        requestNumber: requestNumber,
+        address: {
+          address: addressFormData.address.value,
+          address2: addressFormData.address2.value,
+          city: addressFormData.city.value,
+          state: addressFormData.state.value,
+          zip: addressFormData.zip.value,
+        },
+        contact: {
+          firstname: contactFormData.firstname.value,
+          lastname: contactFormData.lastname.value,
+          email: contactFormData.email.value,
+          phone: contactFormData.phone.value,
+        },
+      };
 
+      console.log(serviceOrderData);
+      sendRequest({
+        url: "http://localhost:8080/service-orders",
+        method: "POST",
+        body: serviceOrderData,
+        headers: {
+          "content-type": "application/json",
+        },
+      });
 
-
-        console.log(serviceOrderData);
-        createServiceOrder(serviceOrderData).catch(error => {
-          setIsError(true);
-          setIsLoading(false);
-        });
-
-        let newSkipped = skipped;
-        if (isStepSkipped(activeStep)) {
-          newSkipped = new Set(newSkipped.values());
-          newSkipped.delete(activeStep);
-        }
-  
-        setActiveStep((prevActiveStep) => prevActiveStep + 1);
-        setSkipped(newSkipped);
+      let newSkipped = skipped;
+      if (isStepSkipped(activeStep)) {
+        newSkipped = new Set(newSkipped.values());
+        newSkipped.delete(activeStep);
       }
 
+      setActiveStep((prevActiveStep) => prevActiveStep + 1);
+      setSkipped(newSkipped);
+    }
   };
 
   const handleBack = () => {
@@ -158,9 +145,16 @@ const NewServiceOrder = () => {
       </Stepper>
       {activeStep === steps.length ? (
         <React.Fragment>
-          <Typography sx={{ mt: 2, mb: 1 }}>
-            All steps completed - you&apos;re finished
-          </Typography>
+          {isLoading && <p style={{ textAlign: "center" }}>Processing..</p>}
+          {isError && (
+            <p style={{ textAlign: "center" }}>Something went wrong!</p>
+          )}
+          {!isError && (
+            <Typography sx={{ mt: 2, mb: 1 }}>
+              Service Order Created Successfully!
+            </Typography>
+          )}
+
           <Box sx={{ display: "flex", flexDirection: "row", pt: 2 }}>
             <Box sx={{ flex: "1 1 auto" }} />
             <Button onClick={handleReset}>Reset</Button>
@@ -170,11 +164,11 @@ const NewServiceOrder = () => {
         <React.Fragment>
           <Typography sx={{ mt: 2, mb: 1 }}>
             Step {activeStep + 1}
-            {activeStep === 0 && <RequestInfoForm value={requestNumber}/>}
+            {activeStep === 0 && <RequestInfoForm value={requestNumber} />}
             {activeStep === 1 && (
-              <AddressForm addressFormData={addressFormData}/>
+              <AddressForm addressFormData={addressFormData} />
             )}
-            {activeStep === 2 && <ContactForm data={contactFormData}/>}
+            {activeStep === 2 && <ContactForm data={contactFormData} />}
           </Typography>
           <Box sx={{ display: "flex", flexDirection: "row", pt: 2 }}>
             <Button
